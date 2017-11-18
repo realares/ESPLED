@@ -49,7 +49,7 @@ const char* password = "yyyyyyyyyyyyyyyyyyy";
 
 unsigned int localPort = UDP_PORT;      // local port to listen for UDP packets
 byte packetBuffer[MAX_UDP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
-byte packetLedChangeTable[((NUM_LEDS * 8) + 7) / 8];
+byte packetLedChangeTable[((NUM_LEDS) + 7) / 8];
 
 void setup()
 {
