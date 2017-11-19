@@ -1,23 +1,24 @@
-#include <BitBool.h>
+#include <BitBool.h>             
 #include <Math.h>
 
 #include <WiFiUdp.h>
 #include <WiFiServer.h>
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
-#include <ESP8266WiFiType.h>
-#include <ESP8266WiFiSTA.h>
-#include <ESP8266WiFiScan.h>
-#include <ESP8266WiFiMulti.h>
-#include <ESP8266WiFiGeneric.h>
-#include <ESP8266WiFiAP.h>
 #include <ESP8266WiFi.h>
 #include <Adafruit_NeoPixel.h>
+#include <WiFiManager.h>
+#include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
+#include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
+#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
+#include <Ticker.h> //for LED status
+
+#define BLUE_LED_PIN 2
 #define LEDPIN D4             // Neopixel Pin ( hier wurde der digitalpin f�r die Pixel angeschlossen! )
 #define NUM_LEDS 60
-#define BRIGHTNESS 50        // Helligkeit hardcoded
-#define MAX_UDP_PACKET_SIZE 255
+#define BRIGHTNESS 255        // Helligkeit hardcoded
+#define MAX_UDP_PACKET_SIZE 1024
 #define UDP_PORT 2390
 
 
@@ -43,9 +44,7 @@ byte neopix_gamma[] = {
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LEDPIN, NEO_RGBW + NEO_KHZ800);
 WiFiUDP Udp;
-
-const char* ssid     = "xxxxxxxxxxxxxxxxxxx";
-const char* password = "yyyyyyyyyyyyyyyyyyy";
+Ticker ticker;
 
 unsigned int localPort = UDP_PORT;      // local port to listen for UDP packets
 byte packetBuffer[MAX_UDP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
@@ -58,33 +57,44 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
-  IPAddress ip(192,168,10,200);
-  IPAddress gateway(192,168,10,1);
-  IPAddress subnet(255,255,255,0);
-  
-  Serial.println("Startup...");
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  pinMode(BLUE_LED_PIN, OUTPUT);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.config(ip, gateway, subnet);
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  WiFiManager wifiManager;
+  //wifiManager.resetSettings();   //reset settings - for testing
+  wifiManager.setConfigPortalTimeout(180);
+  wifiManager.setAPCallback(configModeCallback);
+  wifiManager.setSTAStaticIPConfig(IPAddress(192,168,0,200), IPAddress(192,168,0,1), IPAddress(255,255,255,0));
+  if(!wifiManager.autoConnect()){
+    Serial.println("failed to connect, we should reset as see if it connects");
+    delay(3000);
+    ESP.reset();
+    delay(5000);
   }
-
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  Serial.println("connected...yeey :)");
+  ticker.detach();
 
   strip.setBrightness(BRIGHTNESS);
   strip.begin();
   strip.show();
 
   Udp.begin(localPort);
+
+  digitalWrite(BLUE_LED_PIN, HIGH); // turn off blue LED
+}
+
+//gets called when WiFiManager enters configuration mode
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  Serial.println(myWiFiManager->getConfigPortalSSID());    // if you used auto generated SSID, print it
+  ticker.attach(0.2, tick);                                // entered config mode, make led toggle faster
+} 
+
+void tick()
+{
+  //toggle state
+  int state = digitalRead(BLUE_LED_PIN);  // get the current state of GPIO1 pin
+  digitalWrite(BLUE_LED_PIN, !state);     // set pin to the opposite state
 }
 
 void loop()
@@ -92,7 +102,7 @@ void loop()
   
   while (Udp.parsePacket()) {
     int receivedCount = Udp.read(packetBuffer, MAX_UDP_PACKET_SIZE); // read the packet into the buffer
-    if (receivedCount > 8) 
+    if (receivedCount >= sizeof packetLedChangeTable) 
     {
       memcpy(packetLedChangeTable, packetBuffer, sizeof packetLedChangeTable);
       auto b = toBitBool(packetLedChangeTable);
@@ -106,20 +116,20 @@ void loop()
         if (b.get(i)) 
         {          
           if (receivedCount < (bufferPos + 3))
-            break;
-            
-            cr   = packetBuffer[bufferPos++];
-            cg   = packetBuffer[bufferPos++];
-            cb   = packetBuffer[bufferPos++];
+            break;          
+          cr   = packetBuffer[bufferPos++];
+          cg   = packetBuffer[bufferPos++];
+          cb   = packetBuffer[bufferPos++];
+          setNeoRGBW(i, cr, cg, cb);      
         }
-        setNeoRGBW(i, cr, cg, cb);      
       }
-
       strip.show();
       
     }
   }
 }
+
+
 
 int min(int a, int b)
 {
