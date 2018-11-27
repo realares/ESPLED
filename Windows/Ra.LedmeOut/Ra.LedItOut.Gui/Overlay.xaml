@@ -1,0 +1,16 @@
+﻿<Window x:Class="Ra.LedItOut.Gui.Overlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Ra.LedItOut.Gui"
+        mc:Ignorable="d"
+       WindowStyle="None" WindowState="Maximized" AllowsTransparency="True"
+        Title="MainWindow" Height="350" Width="525">
+    <!--<Window.Background>
+        <SolidColorBrush Opacity="0.25" Color="White"/>
+    </Window.Background>-->
+    <Canvas x:Name="drawFrame">
+        <!--AllowsTransparency="True"-->
+    </Canvas>
+</Window>
